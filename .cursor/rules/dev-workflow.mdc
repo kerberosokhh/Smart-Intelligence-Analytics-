@@ -1,0 +1,195 @@
+---
+description: 口语驱动开发流程——Markdown Phase 计划同步 Linear Todo，开始/完成/进度/分支推荐
+alwaysApply: false
+---
+# 开发流程口语管理
+
+用户用**日常口语**管理开发时，识别意图并**直接执行**（Linear MCP、改 plan、推荐分支）。纯技术问答不走本规则。
+
+---
+
+## 项目配置（只改这里）
+
+```yaml
+project:
+  name: "智能数据分析助理"
+  team: "SIM"                              # Linear Team Key
+  team_name: "Simonear"                    # Linear Team 名（MCP team 参数）
+  linear_project: "智能数据分析助理"        # Linear Project 名
+
+  repo: "https://github.com/kerberosokhh/Smart-Intelligence-Analytics-.git"
+  default_branch: "main"
+  branch_prefix: "feat"                      # feat | fix | chore
+
+  # ★ 主计划：你用 Markdown 写的 Phase1/2/3 + 列表 → 同步 Linear、划线进度
+  plan_sync: "docs/plans/plan.md"
+
+  # 可选：Agent 详设（Task 步骤、架构），不参与 Linear 同步除非用户 @ 该文件
+  plan_detail: "docs/plans/2026-05-24-intelligent-data-analysis-system.md"
+  plan_template: "docs/plans/TEMPLATE.md"
+
+  sync:
+    issue_prefix: true                     # Linear 标题：[PhaseN] 任务名
+    dedupe_marker: "plan-sync"               # 写在 Issue description 末尾去重
+    on_complete_strike_plan: true          # Linear 标 Done 时，plan 对应行 ~~划线~~
+    on_complete_strike_linear: true        # plan 划线时，Linear 标 Done
+```
+
+---
+
+## 你的 Markdown 计划怎么写
+
+**推荐格式**（`plan_sync` 文件）：
+
+```markdown
+# 智能数据分析助理
+
+## Phase 1 — 基础框架
+- 后端脚手架
+- 健康检查接口
+- Nuxt3 脚手架
+
+## phase2 — 前端 UI
+- 三栏布局
+- SessionList
+- ChartPanel
+
+## Phase 3
+- SQLite 与 Demo 数据
+- LLM 接入
+- SSE 聊天接口
+```
+
+| 元素 | 规则 |
+|------|------|
+| Phase 标题 | `## Phase 1` / `## phase2` / `#### Phase 3 — 副标题` |
+| 任务 | Phase 下每条 `-` 列表 = 1 个 Linear Todo |
+| 已完成 | `- ~~任务名~~ ✅` → Linear **Done**，不再新建 |
+| 忽略 | 代码块、表格行、`**Phase N 验收：**` 等非列表行 |
+
+带标签写法也支持：`- [Phase1] **模块名**：说明`
+
+---
+
+## 口语 → 意图
+
+| 你说 | 意图 | 做什么 |
+|------|------|--------|
+| 同步计划 / 同步到 Linear / 导入 Linear | **SYNC_PLAN** | plan → Linear Todo |
+| 只同步 phase2 / 同步 Phase 1 | **SYNC_PLAN_PHASE** | 只处理指定 Phase |
+| 开始做 X / 开发 X | **START_FEATURE** | Issue → In Progress + 推荐分支 |
+| X 做完了 / 完成 X | **COMPLETE_FEATURE** | Issue → Done + plan 划线（若匹配） |
+| Phase N 完成了 | **COMPLETE_PHASE** | plan 该 Phase 全部 ~~划线~~ + Linear 批量 Done |
+| 完成「健康检查」这条 | **COMPLETE_TASK** | 单条 plan 划线 + 对应 Issue Done |
+| 进度怎么样 / 还剩啥 | **CHECK_PROGRESS** | plan 未完成项 + Linear 看板 |
+| 加个 todo X | **CREATE_TASK** | 单独建 Issue（Todo） |
+| 推荐分支 / 切分支 | **SUGGEST_BRANCH** | 输出 git 命令，不自动 checkout |
+
+**优先级：** 同步 > 开始功能 > 完成功能
+
+---
+
+## 共用：解析 plan（PLAN_PARSE）
+
+对 `{plan_sync}` 或用户 @ 的 `.md`：
+
+1. 用正则匹配 Phase 块：`^#{2,4}\s*[Pp]hase\s*(\d+)`  
+2. 块内每条 `^\s*-\s+(.+)$` 为任务（跳过代码块内行）  
+3. 提取字段：`phase_num`、`title`（粗体优先，否则冒号前）、`done`（含 `~~`）、`raw_line`  
+4. Linear 标题：`[Phase{N}] {title}`  
+5. 指纹：`plan-sync: {相对路径}#phase{N}#{slug}`，`slug`=title 的 kebab-case  
+
+---
+
+## SYNC_PLAN（Markdown → Linear Todo）
+
+1. **源文件**：默认 `{plan_sync}`；用户 @ 其他 md 则以 @ 为准  
+2. `list_issues`（project=`{linear_project}`）拉现有 Issue，按指纹/标题去重  
+3. 每条未完成任务 → `save_issue`：`state: "Todo"`，`team: {team_name}`，`project: {linear_project}`  
+4. description 模板：
+
+   ```markdown
+   {raw_line}
+
+   来源：`{plan_file}` · Phase {N}
+   plan-sync: {plan_file}#phase{N}#{slug}
+   ```
+
+5. plan 已 ~~划线~~ → 已有 Issue 标 `Done`；无 Issue 则跳过创建  
+6. **回复**：按 Phase 统计新建/更新/Done 数 + 每条 Issue 链接  
+
+**禁止：** 同步时改 plan 内容；不删除 Linear 里 plan 已删的任务（仅提示 orphan 数量）
+
+---
+
+## COMPLETE_PHASE / COMPLETE_TASK
+
+**COMPLETE_PHASE（Phase N 完成了）：**
+
+1. PLAN_PARSE 取 Phase N 全部任务行  
+2. 逐行改为 `- ~~原文~~ ✅`（保留 `[PhaseN]` 等格式）  
+3. 若有文首 `**状态:**` 或进度表，更新 Phase N 为已完成  
+4. Linear：该 Phase 下带 `plan-sync:...#phase{N}#` 或 `[PhaseN]` 前缀的 open Issue → `Done`  
+5. 提示 Phase N+1 第一条未完成任务  
+
+**COMPLETE_TASK（完成某一条）：**
+
+1. 在 plan 中模糊匹配任务名，单行 ~~划线~~  
+2. Linear 对应 Issue → `Done`  
+
+---
+
+## START_FEATURE
+
+1. 从口语提取功能名 → slug  
+2. `list_issues` 查重；无则 `save_issue`（**In Progress**），有则更新状态  
+3. 分支名：`{branch_prefix}/{team小写}-{id}-{slug}`，附 `git checkout -b ...`（用户明确要求才执行）  
+4. 若 plan 中有匹配任务，建议一并标 In Progress（**不**自动改 plan，除非用户说「同步状态」）
+
+---
+
+## CHECK_PROGRESS
+
+1. PLAN_PARSE → 按 Phase 统计：总数 / ~~已完成~~ / 待办  
+2. Linear `list_issues` → Todo / In Progress / Done 分组  
+3. 输出：建议当前 Phase、plan 与 Linear 差异（plan 有但 Linear 无 → 提醒「同步计划」）
+
+---
+
+## Git 分支
+
+- `feat/{team}-{id}-{slug}` · `fix/...` · `chore/{team}-{slug}`  
+- 从 `{default_branch}` 拉取；`{repo}` 为 GitHub 地址  
+
+---
+
+## Linear MCP
+
+| 工具 | 用途 |
+|------|------|
+| `list_issues` | 去重、进度 |
+| `save_issue` | 建/改 Todo、In Progress、Done |
+| `save_comment` | 完成说明（可选） |
+
+server：`user-Linear` · team 优先 `{team_name}`，失败试 `{team}`
+
+---
+
+## 示例
+
+**「帮我把计划同步到 Linear」**  
+→ 读 `docs/plans/plan.md` → Phase1/2/… 每条建 Todo → 回报 SIM-x 链接  
+
+**「Phase 1 完成了」**  
+→ plan Phase1 全划线 → Linear 相关 Issue Done → 建议 Phase2 第一项  
+
+**「开始做登录系统」**  
+→ Issue In Progress → `feat/sim-N-login-system`  
+
+---
+
+## 边界
+
+- 技术问答（「SSE 怎么写」）→ 正常回答，不走流程  
+- Linear MCP 不可用 → 仍解析 plan 并输出待创建表格  
+- `repo` 为占位 URL → 提醒修改配置  
