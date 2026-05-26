@@ -9,8 +9,8 @@
 **Tech Stack:** DeepSeek V4 Pro · LangChain · FastAPI · SQLite3 · **Vue 3 · Nuxt 3 · Pinia · vue-echarts** · SSE
 
 **文档版本:** 2026-05-25  
-**状态:** 待实现（Phase 1–4 均未开始，进度见 [§6.1](#61-phase-进度清单细粒度)）  
-**已确认:** Phase 1 业务数据采用内置 Demo 数据集（`biz_orders`）；前端采用 **Vue 3**，**Nuxt 3 仅作工程化适配**（路由/构建/代理，不做 SSR 复杂化）
+**状态:** Phase 1–4 已完成（全栈可演示）  
+**已确认:** Phase 1 业务数据采用内置 Demo 数据集（`biz_orders`）；前端采用 **Vue 3**，**Nuxt 3 仅作工程化适配**（路由/构建/代理，不做 SSR 复杂化）；DeepSeek 接入方案经 **LangChain Docs MCP** 选型，见 [ADR-001](../adr/001-deepseek-via-chatdeepseek.md)
 
 ---
 
@@ -114,7 +114,7 @@ backend/
 | 模块 | 职责 | 关键技术 |
 |------|------|----------|
 | **API 网关层** | 路由、CORS、鉴权（可选）、SSE | FastAPI, `sse-starlette` |
-| **LLM 接入层** | 封装 DeepSeek V4 Pro，统一 chat/completion 接口 | `langchain-openai`（OpenAI 兼容 API） |
+| **LLM 接入层** | 封装 DeepSeek V4 Pro，统一 chat/completion 接口 | `langchain-deepseek`（`ChatDeepSeek`） |
 | **会话管理** | 创建/删除/重命名会话，绑定用户（可选） | SQLite ORM + REST API |
 | **上下文记忆** | 多轮对话历史、Token 窗口裁剪、摘要压缩 | `ConversationBufferWindowMemory` 或自定义 |
 | **NL2SQL Agent** | Schema 注入 → SQL 生成 → 校验 → 执行 → 自然语言总结 | LangChain Agent + SQLDatabase Toolkit |
@@ -311,16 +311,29 @@ interface ChartSpec {
 
 ### 4.1 DeepSeek V4 Pro 接入
 
-```python
-from langchain_openai import ChatOpenAI
+> **选型来源：** 开发阶段通过 Cursor **LangChain Docs MCP**（`search_docs_by_lang_chain` / `query_docs_filesystem_docs_by_lang_chain`）检索官方文档，决策记录见 [ADR-001](../adr/001-deepseek-via-chatdeepseek.md)。
 
-llm = ChatOpenAI(
-    model="deepseek-v4-pro",
-    api_key=settings.DEEPSEEK_API_KEY,
-    base_url="https://api.deepseek.com/v1",
-    streaming=True,
-)
+**官方推荐（已采纳）：** 包 `langchain-deepseek`，类 `ChatDeepSeek`，模型 `deepseek-v4-pro`。
+
+- 文档：[ChatDeepSeek integration](https://docs.langchain.com/oss/python/integrations/chat/deepseek)
+- API：[DeepSeek Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing)
+
+**实现（`backend/app/core/llm.py`）：**
+
+```python
+from langchain_deepseek import ChatDeepSeek
+
+def get_llm(*, streaming: bool = False) -> ChatDeepSeek:
+    return ChatDeepSeek(
+        model=settings.deepseek_model,  # deepseek-v4-pro
+        api_key=settings.deepseek_api_key,
+        streaming=streaming,
+        temperature=0,
+        max_retries=2,
+    )
 ```
+
+**备选方案（未采用）：** `ChatOpenAI` + `base_url="https://api.deepseek.com/v1"` 可用于 OpenAI 兼容调用，但 LangChain 文档指出非 OpenAI 特有字段（如 thinking）不会保留；DeepSeek 原生能力优先使用 `langchain-deepseek`。
 
 ### 4.2 Agent 工具链
 
@@ -448,23 +461,23 @@ flowchart LR
 
 #### Phase 3 — 后端接口研发
 
-- [Phase3] **SQLite 连接管理**：`sqlite.py` 连接池、只读查询执行器（行数/超时限制）
-- [Phase3] **Schema 迁移**：`001_init.sql`（`sys_*` + `biz_orders` 表）
-- [Phase3] **Demo 示例数据**：`002_demo_data.sql`（50+ 条订单种子数据）
-- [Phase3] **ORM 模型**：`models.py` SQLAlchemy 定义
-- [Phase3] **LLM 接入**：DeepSeek V4 Pro 配置、`core/llm.py` streaming 封装
-- [Phase3] **会话管理 API**：`GET/POST/PATCH/DELETE /api/sessions`
-- [Phase3] **消息历史 API**：`GET /api/sessions/{id}/messages`
-- [Phase3] **Schema 元信息 API**：`GET /api/schema`
-- [Phase3] **上下文记忆**：`load/save/build_chat_history`，最近 N 轮窗口
-- [Phase3] **NL2SQL Prompt**：Schema 注入、SQLite 方言、只读约束
-- [Phase3] **LangChain SQL Agent**：工具定义、Agent 创建、SQL 安全校验
-- [Phase3] **图表规格 Agent**：`chart_agent.py` 输出 ChartSpec JSON
-- [Phase3] **可视化服务**：`viz_service.py` 字段校验与 table fallback
-- [Phase3] **查询编排服务**：`query_service.py` 串联记忆→Agent→保存
-- [Phase3] **SSE 聊天接口**：`POST /api/chat/stream`
-- [Phase3] **SSE 事件格式**：`token` / `sql` / `data` / `chart` / `done` / `error`
-- [Phase3] **接口测试**：pytest 覆盖 sessions、memory、nl2sql、chat stream
+- ~~[Phase3] **SQLite 连接管理**：`sqlite.py` 连接池、只读查询执行器（行数/超时限制）~~ ✅
+- ~~[Phase3] **Schema 迁移**：`001_init.sql`（`sys_*` + `biz_orders` 表）~~ ✅
+- ~~[Phase3] **Demo 示例数据**：`002_demo_data.sql`（50+ 条订单种子数据）~~ ✅
+- ~~[Phase3] **ORM 模型**：`models.py` SQLAlchemy 定义~~ ✅
+- ~~[Phase3] **LLM 接入**：DeepSeek V4 Pro 配置、`core/llm.py` streaming 封装~~ ✅
+- ~~[Phase3] **会话管理 API**：`GET/POST/PATCH/DELETE /api/sessions`~~ ✅
+- ~~[Phase3] **消息历史 API**：`GET /api/sessions/{id}/messages`~~ ✅
+- ~~[Phase3] **Schema 元信息 API**：`GET /api/schema`~~ ✅
+- ~~[Phase3] **上下文记忆**：`load/save/build_chat_history`，最近 N 轮窗口~~ ✅
+- ~~[Phase3] **NL2SQL Prompt**：Schema 注入、SQLite 方言、只读约束~~ ✅
+- ~~[Phase3] **LangChain SQL Agent**：工具定义、Agent 创建、SQL 安全校验~~ ✅
+- ~~[Phase3] **图表规格 Agent**：`chart_agent.py` 输出 ChartSpec JSON~~ ✅
+- ~~[Phase3] **可视化服务**：`viz_service.py` 字段校验与 table fallback~~ ✅
+- ~~[Phase3] **查询编排服务**：`query_service.py` 串联记忆→Agent→保存~~ ✅
+- ~~[Phase3] **SSE 聊天接口**：`POST /api/chat/stream`~~ ✅
+- ~~[Phase3] **SSE 事件格式**：`token` / `sql` / `data` / `chart` / `done` / `error`~~ ✅
+- ~~[Phase3] **接口测试**：pytest 覆盖 sessions、memory、nl2sql、chat stream~~ ✅
 
 **Phase 3 验收：** Postman/curl/pytest 可独立验证全部后端接口。
 
@@ -472,18 +485,18 @@ flowchart LR
 
 #### Phase 4 — 前后端联调
 
-- [Phase4] **前端 API 服务层**：`utils/api.ts` 封装 sessions/messages/schema 调用
-- [Phase4] **SSE 客户端**：`utils/sse.ts` 解析流式事件
-- [Phase4] **会话联调**：`useSessions.ts` 替换 Mock，对接 REST CRUD
-- [Phase4] **聊天联调**：`useChatStream.ts` 对接 SSE，实时渲染 token 文本
-- [Phase4] **SQL/数据展示**：SSE `sql`/`data` 事件更新 MessageList
-- [Phase4] **图表数据绑定**：SSE `chart` 事件 → Pinia → ChartRenderer 动态渲染
-- [Phase4] **流式状态同步**：`isStreaming` 控制输入禁用与 loading 态
-- [Phase4] **会话标题自动更新**：首条用户消息后 PATCH session title
-- [Phase4] **端到端场景 1**：新建会话 →「各品类销售总额」→ 柱状图
-- [Phase4] **端到端场景 2**：多轮追问「只要华东地区的」→ 上下文继承
-- [Phase4] **错误处理联调**：SSE `error` 事件前端 toast/提示
-- [Phase4] **项目文档**：`README.md` 启动说明、`.env.example` 补全
+- ~~[Phase4] **前端 API 服务层**：`utils/api.ts` 封装 sessions/messages/schema 调用~~ ✅
+- ~~[Phase4] **SSE 客户端**：`utils/sse.ts` 解析流式事件~~ ✅
+- ~~[Phase4] **会话联调**：`useSessions.ts` 替换 Mock，对接 REST CRUD~~ ✅
+- ~~[Phase4] **聊天联调**：`useChatStream.ts` 对接 SSE，实时渲染 token 文本~~ ✅
+- ~~[Phase4] **SQL/数据展示**：SSE `sql`/`data` 事件更新 MessageList~~ ✅
+- ~~[Phase4] **图表数据绑定**：SSE `chart` 事件 → Pinia → ChartRenderer 动态渲染~~ ✅
+- ~~[Phase4] **流式状态同步**：`isStreaming` 控制输入禁用与 loading 态~~ ✅
+- ~~[Phase4] **会话标题自动更新**：首条用户消息后 PATCH session title~~ ✅
+- ~~[Phase4] **端到端场景 1**：新建会话 →「各品类销售总额」→ 柱状图~~ ✅
+- ~~[Phase4] **端到端场景 2**：多轮追问「只要华东地区的」→ 上下文继承~~ ✅
+- ~~[Phase4] **错误处理联调**：SSE `error` 事件前端 toast/提示~~ ✅
+- ~~[Phase4] **项目文档**：`README.md` 启动说明、`.env.example` 补全~~ ✅
 
 **Phase 4 验收：** 浏览器完整走通 NL 查库 + 图表 + 多轮对话。
 
@@ -510,14 +523,14 @@ flowchart LR
 
 > 完成 Phase N 后，REQUIRED：打开 `docs/plans/2026-05-24-intelligent-data-analysis-system.md`，更新 §6.1 Phase N 全部条目为 ~~删除线~~ ✅，并更新文首状态行，再开始 Phase N+1。
 
-**当前进度（最后更新：2026-05-25）：**
+**当前进度（最后更新：2026-05-26）：**
 
 | Phase | 状态 |
 |-------|------|
-| Phase 1 | ⬜ 未开始 |
-| Phase 2 | ⬜ 未开始 |
-| Phase 3 | ⬜ 未开始 |
-| Phase 4 | ⬜ 未开始 |
+| Phase 1 | ✅ 已完成 |
+| Phase 2 | ✅ 已完成 |
+| Phase 3 | ✅ 已完成 |
+| Phase 4 | ✅ 已完成 |
 
 ---
 
@@ -553,7 +566,7 @@ flowchart LR
 - Create: `backend/app/main.py`
 - Create: `backend/.env.example`
 
-**Step 1:** 创建 `requirements.txt`，包含 fastapi、uvicorn、langchain、langchain-openai、langchain-community、sqlalchemy、aiosqlite、pydantic、python-dotenv、sse-starlette。
+**Step 1:** 创建 `requirements.txt`，包含 fastapi、uvicorn、langchain、langchain-openai、**langchain-deepseek**、langchain-community、sqlalchemy、aiosqlite、pydantic、python-dotenv、sse-starlette。
 
 **Step 2:** 实现 `config.py`，读取 `DEEPSEEK_API_KEY`、`SQLITE_PATH`、`MAX_QUERY_ROWS`、`SQL_TIMEOUT_SECONDS`。
 
@@ -598,7 +611,7 @@ curl http://localhost:8000/api/health
 - Create: `backend/app/core/llm.py`
 - Create: `backend/tests/test_llm.py`
 
-**Step 1:** 封装 `get_llm()` 返回 streaming ChatOpenAI 实例。
+**Step 1:** 封装 `get_llm()` 返回 `ChatDeepSeek` 实例（模型 `deepseek-v4-pro`，见 ADR-001 / LangChain MCP 选型）。
 
 **Step 2:** 编写测试验证 LLM 可响应（需配置 `DEEPSEEK_API_KEY`）。
 

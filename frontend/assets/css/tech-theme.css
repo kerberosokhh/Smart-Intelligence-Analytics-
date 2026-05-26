@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --tech-bg-base: #eef2f8;
+  --tech-bg-mesh: radial-gradient(ellipse 80% 60% at 10% 0%, rgba(14, 165, 233, 0.12), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(99, 102, 241, 0.1), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(6, 182, 212, 0.08), transparent 55%),
+    linear-gradient(165deg, #f4f7fc 0%, #e9eff8 45%, #eef3fa 100%);
+  --tech-grid: rgba(14, 165, 233, 0.04);
+  --tech-surface: rgba(255, 255, 255, 0.72);
+  --tech-surface-solid: #ffffff;
+  --tech-surface-elevated: rgba(255, 255, 255, 0.88);
+  --tech-border: rgba(14, 165, 233, 0.14);
+  --tech-border-strong: rgba(14, 165, 233, 0.28);
+  --tech-text: #0f172a;
+  --tech-text-secondary: #64748b;
+  --tech-text-muted: #94a3b8;
+  --tech-accent: #0ea5e9;
+  --tech-accent-2: #6366f1;
+  --tech-accent-3: #06b6d4;
+  --tech-gradient: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+  --tech-gradient-soft: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(99, 102, 241, 0.1) 100%);
+  --tech-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(14, 165, 233, 0.06);
+  --tech-shadow-md: 0 4px 24px rgba(14, 165, 233, 0.1), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --tech-shadow-glow: 0 0 0 1px rgba(14, 165, 233, 0.12), 0 8px 32px rgba(14, 165, 233, 0.12);
+  --tech-radius: 14px;
+  --tech-radius-sm: 10px;
+  --tech-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --tech-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --el-color-primary: #0ea5e9;
+  --el-color-primary-light-3: #67c8f0;
+  --el-color-primary-light-5: #94daf5;
+  --el-color-primary-light-7: #c2ebfa;
+  --el-color-primary-light-8: #d9f3fc;
+  --el-color-primary-light-9: #ecf9fe;
+  --el-color-primary-dark-2: #0b84ba;
+  --el-border-radius-base: 10px;
+  --el-border-radius-small: 8px;
+  --el-fill-color-blank: rgba(255, 255, 255, 0.9);
+  --el-bg-color: var(--tech-surface-solid);
+  --el-text-color-primary: var(--tech-text);
+  --el-text-color-regular: var(--tech-text-secondary);
+}
+
+html,
+body,
+#__nuxt {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--tech-font);
+  color: var(--tech-text);
+  background: var(--tech-bg-mesh);
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: linear-gradient(var(--tech-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--tech-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#__nuxt {
+  position: relative;
+  z-index: 1;
+}
+
+.tech-glass {
+  background: var(--tech-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--tech-border);
+  box-shadow: var(--tech-shadow-sm);
+}
+
+.tech-gradient-text {
+  background: var(--tech-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.el-button--primary {
+  background: var(--tech-gradient) !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.el-button--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
+}
+
+.el-textarea__inner,
+.el-input__wrapper {
+  border-radius: var(--tech-radius-sm) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--tech-border) !important;
+  background: var(--tech-surface-elevated) !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.el-textarea {
+  width: 100%;
+}
+
+.el-textarea__inner:focus,
+.el-input__wrapper.is-focus {
+  border-color: var(--tech-accent) !important;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15) !important;
+}
+
+.el-table {
+  --el-table-border-color: var(--tech-border);
+  --el-table-header-bg-color: rgba(14, 165, 233, 0.06);
+  border-radius: var(--tech-radius-sm);
+  overflow: hidden;
+}
